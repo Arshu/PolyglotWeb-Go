@@ -34,6 +34,15 @@ func authRouter(r *mux.Router) {
 	r.HandleFunc("/GetToken", handleGetToken).Methods("POST")
 }
 
+// @Summary      Register Method
+// @Tags         access
+// @Produce      json
+// @Param        userEmail      query     string  false  "User email"  Format(email)
+// @Param        userPassword   query     string  false  "User password"
+// @Success      200  {object}   User
+// @Failure      400  {object}   nil
+// @Failure      401  {object}   nil
+// @Router       /Register [post]
 func handleRegister(w http.ResponseWriter, r *http.Request) {
 	email := r.URL.Query().Get("userEmail")
 	password := r.URL.Query().Get("userPassword")
@@ -61,12 +70,18 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message": "User created successfully",
-		"user":    user,
-	})
+	json.NewEncoder(w).Encode(user)
 }
 
+// @Summary      Login Method
+// @Tags         access
+// @Produce      json
+// @Param        userEmail      query     string  false  "User email"  Format(email)
+// @Param        userPassword   query     string  false  "User password"
+// @Success      200  {object}   User
+// @Failure      400  {object}   nil
+// @Failure      401  {object}   nil
+// @Router       /Login [post]
 func handleLogin(w http.ResponseWriter, r *http.Request) {
 	email := r.URL.Query().Get("userEmail")
 	password := r.URL.Query().Get("userPassword")
@@ -104,12 +119,18 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message": "Login successful",
-		"user":    user,
-	})
+	json.NewEncoder(w).Encode(user)
 }
 
+// @Summary      GetToken Method
+// @Tags         access
+// @Produce      plain
+// @Param        userEmail      query     string  false  "User email"  Format(email)
+// @Param        userPassword   query     string  false  "User password"
+// @Success      200  {object}   string
+// @Failure      400  {object}   nil
+// @Failure      401  {object}   nil
+// @Router       /GetToken [post]
 func handleGetToken(w http.ResponseWriter, r *http.Request) {
 	email := r.URL.Query().Get("userEmail")
 	password := r.URL.Query().Get("userPassword")
@@ -149,6 +170,11 @@ func handleGetToken(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(session.ID)) // TODO: not documented in swagger, plus ID is not sufficient to reconstruct session later on
 }
 
+// @Summary      Logoff Method
+// @Tags         access
+// @Produce      json
+// @Success      200  {object}   interface{}
+// @Router       /Logoff [post]
 func handleLogoff(w http.ResponseWriter, r *http.Request) {
 	session, err := store.Get(r, SessionName)
 	if err != nil {

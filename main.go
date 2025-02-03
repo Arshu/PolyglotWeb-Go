@@ -10,7 +10,10 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	"github.com/joho/godotenv"
+	httpSwagger "github.com/swaggo/http-swagger"
 	"github.com/wader/gormstore/v2"
+
+	_ "github.com/Arshu/PolyglotWeb-Go/docs"
 )
 
 var (
@@ -46,6 +49,10 @@ func main() {
 	r.Use(loggingMiddleware)
 
 	// Public routes
+	r.PathPrefix("/swagger").Handler(httpSwagger.Handler(
+	// httpSwagger.URL("http://localhost:1323/swagger/doc.json"),
+	))
+
 	r.HandleFunc("/", handleHome).Methods("GET")
 	authRouter(r.PathPrefix("/").Subrouter())
 

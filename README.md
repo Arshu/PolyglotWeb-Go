@@ -4,22 +4,23 @@ Declarative Fullstack (Backend/Frontend) Framework using Htmx Like frontend and 
 
 ## Local Development
 
-1. Install dependencies:
-```bash
-go mod tidy
-```
-
-2. Copy the example environment file and modify as needed:
+1. Copy the example environment file and modify as needed:
 ```bash
 cp .env.example .env
 ```
 
-3. Run the application:
+2. Run the application:
 ```bash
 go run .
 ```
 
+3. Regenerate swagger when there are changes (see `generate.go` for required packages):
+```bash
+go generate .
+```
+
 By default, the server will start on port 3000.
+
 
 ## Docker
 

@@ -1,0 +1,117 @@
+definitions:
+  main.User:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /GetToken:
+    post:
+      parameters:
+      - description: User email
+        format: email
+        in: query
+        name: userEmail
+        type: string
+      - description: User password
+        in: query
+        name: userPassword
+        type: string
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: GetToken Method
+      tags:
+      - access
+  /Login:
+    post:
+      parameters:
+      - description: User email
+        format: email
+        in: query
+        name: userEmail
+        type: string
+      - description: User password
+        in: query
+        name: userPassword
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.User'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: Login Method
+      tags:
+      - access
+  /Logoff:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema: {}
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: Logoff Method
+      tags:
+      - access
+  /Register:
+    post:
+      parameters:
+      - description: User email
+        format: email
+        in: query
+        name: userEmail
+        type: string
+      - description: User password
+        in: query
+        name: userPassword
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.User'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: Register Method
+      tags:
+      - access
+swagger: "2.0"

@@ -49,16 +49,15 @@ func main() {
 	r.Use(loggingMiddleware)
 
 	// Public routes
-	r.PathPrefix("/swagger").Handler(httpSwagger.Handler(
-	// httpSwagger.URL("http://localhost:1323/swagger/doc.json"),
-	))
+	r.PathPrefix("/swagger").Handler(httpSwagger.Handler())
 
-	r.HandleFunc("/", handleHome).Methods("GET")
-	authRouter(r.PathPrefix("/").Subrouter())
+	authRouter(r)
 
 	// Protected routes
-	api := r.PathPrefix("/api").Subrouter()
+	api := r.PathPrefix("/").Subrouter()
 	api.Use(authMiddleware)
+
+	r.NotFoundHandler = loggingMiddleware(http.HandlerFunc(proxyHandler))
 
 	// Get port from environment
 	port := os.Getenv("APP_PORT")

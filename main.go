@@ -47,14 +47,11 @@ func main() {
 
 	// Public routes
 	r.HandleFunc("/", handleHome).Methods("GET")
-	r.HandleFunc("/auth/register", handleRegister).Methods("POST")
-	r.HandleFunc("/auth/login", handleLogin).Methods("POST")
-	r.HandleFunc("/auth/logout", handleLogout).Methods("POST")
+	authRouter(r.PathPrefix("/").Subrouter())
 
 	// Protected routes
 	api := r.PathPrefix("/api").Subrouter()
 	api.Use(authMiddleware)
-	api.HandleFunc("/profile", handleGetProfile).Methods("GET")
 
 	// Get port from environment
 	port := os.Getenv("APP_PORT")
@@ -74,24 +71,9 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func authMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		session, err := store.Get(r, "session-name")
-		if err != nil {
-			http.Error(w, "Session error", http.StatusInternalServerError)
-			return
-		}
-		if auth, ok := session.Values["authenticated"].(bool); !ok || !auth {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
 func handleHome(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Welcome to PolyglotWeb API",
 		"status":  "running",
 	})
-} 
+}

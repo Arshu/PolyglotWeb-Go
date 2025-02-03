@@ -2,40 +2,56 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
+	"github.com/gorilla/mux"
 	"golang.org/x/crypto/bcrypt"
 )
 
-type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+const SessionName string = "GO_SESSION" // Session cookie name
+const UserIDKey string = "user_id"      // Key used in session
+
+func authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, err := store.Get(r, SessionName)
+		if err != nil {
+			http.Error(w, "Session error", http.StatusInternalServerError)
+			return
+		}
+		if user_id, ok := session.Values[UserIDKey].(uint); !ok || user_id == 0 {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
-type RegisterRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Name     string `json:"name"`
+func authRouter(r *mux.Router) {
+	r.HandleFunc("/Register", handleRegister).Methods("POST") // TODO: not in swagger
+	r.HandleFunc("/Login", handleLogin).Methods("POST")
+	r.HandleFunc("/Logoff", handleLogoff).Methods("POST")
+	r.HandleFunc("/GetToken", handleGetToken).Methods("POST")
 }
 
 func handleRegister(w http.ResponseWriter, r *http.Request) {
-	var req RegisterRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	email := r.URL.Query().Get("userEmail")
+	password := r.URL.Query().Get("userPassword")
+	if email == "" || password == "" {
+		http.Error(w, "Expected userEmail and userPassword in query", http.StatusBadRequest)
 		return
 	}
 
 	// Hash password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		http.Error(w, "Could not hash password", http.StatusInternalServerError)
 		return
 	}
 
 	user := User{
-		Email:    req.Email,
+		Email:    email,
 		Password: string(hashedPassword),
-		Name:     req.Name,
 	}
 
 	result := db.Create(&user)
@@ -47,36 +63,33 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "User created successfully",
-		"user": map[string]interface{}{
-			"id":    user.ID,
-			"email": user.Email,
-			"name":  user.Name,
-		},
+		"user":    user,
 	})
 }
 
 func handleLogin(w http.ResponseWriter, r *http.Request) {
-	var req LoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	email := r.URL.Query().Get("userEmail")
+	password := r.URL.Query().Get("userPassword")
+	if email == "" || password == "" {
+		http.Error(w, "Expected userEmail and userPassword in query", http.StatusBadRequest)
 		return
 	}
 
 	var user User
-	result := db.Where("email = ?", req.Email).First(&user)
+	result := db.Where("email = ?", email).First(&user)
 	if result.Error != nil {
 		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
 	// Compare password
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
 		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
 	// Create session
-	session, err := store.Get(r, "session-name")
+	session, err := store.Get(r, SessionName)
 	if err != nil {
 		http.Error(w, "Session error", http.StatusInternalServerError)
 		return
@@ -86,32 +99,68 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	session.Values["user_id"] = user.ID
 
 	if err := session.Save(r, w); err != nil {
+		log.Println(err)
 		http.Error(w, "Could not save session", http.StatusInternalServerError)
 		return
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Login successful",
-		"user": map[string]interface{}{
-			"id":    user.ID,
-			"email": user.Email,
-			"name":  user.Name,
-		},
+		"user":    user,
 	})
 }
 
-func handleLogout(w http.ResponseWriter, r *http.Request) {
-	session, err := store.Get(r, "session-name")
+func handleGetToken(w http.ResponseWriter, r *http.Request) {
+	email := r.URL.Query().Get("userEmail")
+	password := r.URL.Query().Get("userPassword")
+	if email == "" || password == "" {
+		http.Error(w, "Expected userEmail and userPassword in query", http.StatusBadRequest)
+		return
+	}
+
+	var user User
+	result := db.Where("email = ?", email).First(&user)
+	if result.Error != nil {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	// Compare password
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	// Create session
+	session, err := store.Get(r, SessionName)
 	if err != nil {
 		http.Error(w, "Session error", http.StatusInternalServerError)
 		return
 	}
 
-	session.Values["authenticated"] = false
-	session.Values["user_id"] = nil
-	session.Options.MaxAge = -1 // This will delete the session
+	session.Values[UserIDKey] = user.ID
 
 	if err := session.Save(r, w); err != nil {
+		log.Println(err)
+		http.Error(w, "Could not save session", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write([]byte(session.ID)) // TODO: not documented in swagger, plus ID is not sufficient to reconstruct session later on
+}
+
+func handleLogoff(w http.ResponseWriter, r *http.Request) {
+	session, err := store.Get(r, SessionName)
+	if err != nil {
+		http.Error(w, "Session error", http.StatusInternalServerError)
+		return
+	}
+
+	session.Values[UserIDKey] = nil
+	session.Options.MaxAge = -1 // Delete the session
+
+	if err := session.Save(r, w); err != nil {
+		log.Println(err)
 		http.Error(w, "Could not save session", http.StatusInternalServerError)
 		return
 	}
@@ -120,31 +169,3 @@ func handleLogout(w http.ResponseWriter, r *http.Request) {
 		"message": "Logged out successfully",
 	})
 }
-
-func handleGetProfile(w http.ResponseWriter, r *http.Request) {
-	session, err := store.Get(r, "session-name")
-	if err != nil {
-		http.Error(w, "Session error", http.StatusInternalServerError)
-		return
-	}
-
-	userID, ok := session.Values["user_id"].(uint)
-	if !ok {
-		http.Error(w, "User not found", http.StatusNotFound)
-		return
-	}
-
-	var user User
-	if err := db.First(&user, userID).Error; err != nil {
-		http.Error(w, "User not found", http.StatusNotFound)
-		return
-	}
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"user": map[string]interface{}{
-			"id":    user.ID,
-			"email": user.Email,
-			"name":  user.Name,
-		},
-	})
-} 
